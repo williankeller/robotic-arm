@@ -6,16 +6,19 @@ Servo baseServo;
 Servo shoulderServo;
 Servo elbowServo;
 Servo wristServo;
+Servo clawServo;
 
 // Servo pin connections
 const int baseServoPin = 3;
 const int shoulderServoPin = 5;
 const int elbowServoPin = 6;
 const int wristServoPin = 9;
+const int handServoPin = 10;
+const int clawServoPin = 11;
 
 // Function to convert degrees to microseconds for the servo pulse width
 int angleToMicroseconds(int angle) {
-  return map(angle, 0, 180, 544, 2400); // Values for standard servos
+  return map(angle, 0, 180, 800, 2200); // Values for standard servos
 }
 
 // Function to write angles to the servos
@@ -26,8 +29,6 @@ void writeServoAngles(float base, float shoulder, float elbow, float wrist) {
   wristServo.writeMicroseconds(angleToMicroseconds((int)wrist));
 }
 
-// Inverse kinematics calculations (from the previous Python function)
-// Note: The following code will need to be adapted into proper C++ syntax
 void inverseKinematics(float x, float y, float z, float* angles) {
   // Arm dimensions in mm
   const float baseHeight = 80;
@@ -63,11 +64,13 @@ void inverseKinematics(float x, float y, float z, float* angles) {
 }
 
 void setup() {
+  Serial.begin(9600);
   // Attach the servos to their respective pins
   baseServo.attach(baseServoPin);
   shoulderServo.attach(shoulderServoPin);
   elbowServo.attach(elbowServoPin);
   wristServo.attach(wristServoPin);
+  clawServo.attach(clawServoPin);
 }
 
 void loop() {
@@ -80,10 +83,54 @@ void loop() {
   float angles[4];
   
   // Perform inverse kinematics calculation
-  inverseKinematics(x, y, z, angles);
-  
+  //inverseKinematics(x, y, z, angles);
+
+  // Check if data is available to read from the serial buffer
+  if (Serial.available() > 0) {
+    // Read the incoming string until a newline is received
+    String data = Serial.readStringUntil('\n');
+
+
+    if (data.startsWith("grab")) {
+      writeServoAngles(90.0, 40.0, 40.0, 40.0);
+      delay(800);
+      writeServoAngles(90.0, 0.0, 60.0, 40.0);
+      //clawServo.writeMicroseconds(angleToMicroseconds(60));
+      delay(2000);
+      writeServoAngles(90.0, 90.0, 40.0, 40.0);
+      delay(800);
+      writeServoAngles(160.0, 60.0, 40.0, 30.0);
+      delay(2000);
+    }
+
+    // Check if the string starts with "Base"
+    if (data.startsWith("base")) {
+      int angle = data.substring(5).toInt();
+      baseServo.writeMicroseconds(angleToMicroseconds((int)angle));
+    }
+    // Check if the string starts with "shoulder"
+    if (data.startsWith("shoulder")) {
+      int angle = data.substring(9).toInt(); 
+      shoulderServo.writeMicroseconds(angleToMicroseconds((int)angle));
+    }
+    // Check if the string starts with "elbow"
+    if (data.startsWith("elbow")) {
+      int angle = data.substring(6).toInt(); 
+      elbowServo.writeMicroseconds(angleToMicroseconds((int)angle));
+    }
+    // Check if the string starts with "wrist"
+    if (data.startsWith("wrist")) {
+      int angle = data.substring(6).toInt(); 
+      wristServo.writeMicroseconds(angleToMicroseconds((int)angle));
+    }
+    // Check if the string starts with "claw"
+    if (data.startsWith("claw")) {
+      int angle = data.substring(5).toInt(); 
+      clawServo.writeMicroseconds(angleToMicroseconds((int)angle));
+    }
+  }  
   // Write the calculated angles to the servos
-  writeServoAngles(angles[0], angles[1], angles[2], angles[3]);
+  //writeServoAngles(angles[0], angles[1], angles[2], angles[3]);
   
   // Small delay before the next calculation
   delay(2000);
