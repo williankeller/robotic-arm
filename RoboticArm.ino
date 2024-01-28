@@ -22,12 +22,12 @@ struct RobotArm {
 
 // Initialize the robot arm with specific values
 RobotArm arm = {
-    {"base",     3, 0, 180},   // base, pin, min, max
-    {"shoulder", 5, 0, 180},   // shoulder, pin, min, max
-    {"elbow",    6, 0, 180},   // elbow, pin, min, max
-    {"wrist",    9, 0, 180},   // wrist, pin, min, max
-    {"hand",     10, 0, 180},  // hand, pin, min, max
-    {"gripper",  11, 25, 155}  // gripper, pin, min, max
+    {"base",     3, 0, 180},  // base, pin, min, max
+    {"shoulder", 5, 0, 180},  // shoulder, pin, min, max
+    {"elbow",    6, 0, 180},  // elbow, pin, min, max
+    {"wrist",    9, 0, 180},  // wrist, pin, min, max
+    {"hand",     10, 0, 180}, // hand, pin, min, max
+    {"gripper",  11, 0, 98}   // gripper, pin, min, max
 };
 
 
@@ -40,6 +40,12 @@ void setup() {
     arm.elbow.servo.attach(arm.elbow.pin);
     arm.wrist.servo.attach(arm.wrist.pin);
     arm.gripper.servo.attach(arm.gripper.pin);
+
+    // Move the arm to its initial position
+    moveShoulder(140);
+    moveElbow(120);
+    moveWrist(90);
+    moveGripper(0);
 }
 
 void loop() {
@@ -79,29 +85,51 @@ void loop() {
             moveHand(angle);
         }
 
-        if (data.startsWith("arm")) {
-            int baseAngle = data.substring(4, 7).toInt();
-            int shoulderAngle = data.substring(8, 11).toInt();
-            int elbowAngle = data.substring(12, 15).toInt();
-            int wristAngle = data.substring(16, 19).toInt();
-            int handAngle = data.substring(20, 23).toInt();
-            moveArm(baseAngle, shoulderAngle, elbowAngle, wristAngle, handAngle);
+        if (data.startsWith("grab")) {
+            moveShoulder(90);
+            moveElbow(130);
+            delay(500);
+            moveShoulder(30);
+            delay(500);
+            moveWrist(0);
+            delay(500);
+            moveElbow(130);
+            moveGripper(180);
+            moveWrist(90);
+            delay(2000);
+            // Move the arm to its initial position
+            moveShoulder(140);
+            moveElbow(180);
+            moveWrist(90);
         }
     }
 }
 
 // Function to set the servo angle
-void setServoPosition(ArmPart part, int angle) {
+void setServoPosition(ArmPart &part, int targetAngle) {
+    targetAngle = constrain(targetAngle, part.minAngle, part.maxAngle); // Constrain the target angle within limits
+
+    int currentAngle = part.servo.read(); // Read the current position of the servo
+    int stepSize = 1;  // Define the step size for smoother movement, can be adjusted for different servos
+
+    if (currentAngle < targetAngle) {
+        for (int pos = currentAngle; pos < targetAngle; pos += stepSize) {
+            part.servo.write(pos); // Move to the next position
+            delay(15); // Wait for 15ms to slow down the movement
+        }
+    } else {
+        for (int pos = currentAngle; pos > targetAngle; pos -= stepSize) {
+            part.servo.write(pos); // Move to the next position
+            delay(15); // Wait for 15ms to slow down the movement
+        }
+    }
+
     Serial.print("Pin: ");
     Serial.print(part.pin);
     Serial.print(": ");
     Serial.print(part.name);
     Serial.print(", Angle: ");
-    Serial.print(angle);
-    Serial.print("\n");
-
-    angle = constrain(angle, part.minAngle, part.maxAngle);
-    part.servo.write(angle);  // Use the write method to set the servo position
+    Serial.println(targetAngle);
 }
 
 void moveBase(int angle) {
