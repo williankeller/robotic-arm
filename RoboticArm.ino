@@ -12,11 +12,12 @@ struct ArmPart {
 
 // Define a structure for the robot arm
 struct RobotArm {
-    ArmPart base;
-    ArmPart shoulder;
-    ArmPart elbow;
-    ArmPart wrist;
-    ArmPart gripper;
+    ArmPart base;       // Base - Turns arm left to right
+    ArmPart shoulder;   // Shoulder - First part of the arm
+    ArmPart elbow;      // Elbow - Second junction of the arm
+    ArmPart wrist;      // Wrist - Third junction of the arm
+    ArmPart hand;       // Hand - Rotates the wrist 180 degrees
+    ArmPart gripper;    // Gripper - Grasps objects
 };
 
 // Initialize the robot arm with specific values
@@ -25,7 +26,8 @@ RobotArm arm = {
     {"shoulder", 5, 0, 180},   // shoulder, pin, min, max
     {"elbow",    6, 0, 180},   // elbow, pin, min, max
     {"wrist",    9, 0, 180},   // wrist, pin, min, max
-    {"gripper",  10, 25, 155}  // gripper, pin, min, max
+    {"hand",     10, 0, 180},  // hand, pin, min, max
+    {"gripper",  11, 25, 155}  // gripper, pin, min, max
 };
 
 
@@ -72,16 +74,21 @@ void loop() {
             moveGripper(angle);
         }
 
+        if (data.startsWith("hand")) {
+            int angle = data.substring(5).toInt();
+            moveHand(angle);
+        }
+
         if (data.startsWith("arm")) {
             int baseAngle = data.substring(4, 7).toInt();
             int shoulderAngle = data.substring(8, 11).toInt();
             int elbowAngle = data.substring(12, 15).toInt();
             int wristAngle = data.substring(16, 19).toInt();
-            moveArm(baseAngle, shoulderAngle, elbowAngle, wristAngle);
+            int handAngle = data.substring(20, 23).toInt();
+            moveArm(baseAngle, shoulderAngle, elbowAngle, wristAngle, handAngle);
         }
     }
 }
-// Shoulder min 40
 
 // Function to set the servo angle
 void setServoPosition(ArmPart part, int angle) {
@@ -113,13 +120,18 @@ void moveWrist(int angle) {
     setServoPosition(arm.wrist, angle);
 }
 
+void moveHand(int angle) {
+    setServoPosition(arm.hand, angle);
+}
+
 void moveGripper(int angle) {
     setServoPosition(arm.gripper, angle);
 }
 
-void moveArm(int baseAngle, int shoulderAngle, int elbowAngle, int wristAngle) {
+void moveArm(int baseAngle, int shoulderAngle, int elbowAngle, int wristAngle, int handAngle) {
     moveBase(baseAngle);
     moveShoulder(shoulderAngle);
     moveElbow(elbowAngle);
     moveWrist(wristAngle);
+    moveHand(handAngle);
 }
