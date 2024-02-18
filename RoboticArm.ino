@@ -1,5 +1,6 @@
 #include <Wire.h>
 #include <Servo.h>
+#include <Ramp.h>
 
 // Define a structure for each part of the arm
 struct ArmPart {
@@ -12,15 +13,15 @@ struct ArmPart {
 
 // Define a structure for the robot arm
 struct RobotArm {
-    ArmPart base;       // Base - Turns arm left to right
-    ArmPart shoulder;   // Shoulder - First part of the arm
+    ArmPart base;       // Base - Turns 180° on its axis (left to right)
+    ArmPart shoulder;   // Shoulder - First part of the arm 
     ArmPart elbow;      // Elbow - Second junction of the arm
     ArmPart wrist;      // Wrist - Third junction of the arm
-    ArmPart hand;       // Hand - Rotates the wrist 180 degrees
+    ArmPart hand;       // Hand - Rotates the wrist 180° on its axis on its axis
     ArmPart gripper;    // Gripper - Grasps objects
 };
 
-// Initialize the robot arm with specific values
+// Initialize the arm (part name, pin on the board, min angle, max angle)
 RobotArm arm = {
     {"base",     3, 30, 150}, // base, pin, min, max
     {"shoulder", 5, 0, 180},  // shoulder, pin, min, max
@@ -89,59 +90,7 @@ void loop() {
         }
 
         if (data.startsWith("grab")) {
-            moveShoulder(90);//90
-            moveElbow(130);
-            moveWrist(60);
-            delay(200);
-            openGripper();
-            moveShoulder(40);
-            moveWrist(70);
-            moveElbow(150);
-            delay(500);
-            closeGripper();
-            delay(500);
-            moveInitialPosition();
-            delay(300);
-            moveBase(60);
-            moveShoulder(100);
-            moveWrist(30);
-            openGripper();// open gripper
-            delay(1000);
-            moveInitialPosition();
-        }
-
-        if (data.startsWith("invert")) {
-            moveShoulder(90);//90
-            moveElbow(130);
-            moveWrist(60);
-            delay(200);
-            moveHand(180);
-            openGripper();
-            moveElbow(150);
-            moveShoulder(50);
-            moveWrist(80);
-            moveElbow(160);
-            delay(500);
-            closeGripper();
-            delay(500);
-            moveInitialPosition();
-            delay(300);
-            moveBase(60);
-            moveShoulder(100);
-            moveWrist(30);
-            moveHand(90);
-            delay(1000);
-            openGripper();// open gripper
-            delay(1000);
-            moveInitialPosition();
-        }
-
-        if (data.startsWith("circle")) {
-            drawCircle();
-        }
-
-        if (data.startsWith("square")) {
-            drawSquare();
+          grab();
         }
     }
 }
@@ -150,8 +99,11 @@ void loop() {
 void setServoPosition(ArmPart &part, int targetAngle) {
     targetAngle = constrain(targetAngle, part.minAngle, part.maxAngle); // Constrain the target angle within limits
 
-    int currentAngle = part.servo.read(); // Read the current position of the servo
-    int stepSize = 1;  // Define the step size for smoother movement, can be adjusted for different servos
+    // Read the current position of the servo
+    int currentAngle = part.servo.read();
+
+    // Define the step size for smoother movement
+    int stepSize = 1;
 
     if (currentAngle < targetAngle) {
         for (int pos = currentAngle; pos < targetAngle; pos += stepSize) {
@@ -164,7 +116,7 @@ void setServoPosition(ArmPart &part, int targetAngle) {
             delay(15); // Wait for 15ms to slow down the movement
         }
     }
-
+    // For debugging
     Serial.print("Pin: ");
     Serial.print(part.pin);
     Serial.print(": ");
@@ -211,58 +163,28 @@ void openGripper() {
     setServoPosition(arm.gripper, 0);
 }
 
-void moveArm(int baseAngle, int shoulderAngle, int elbowAngle, int wristAngle, int handAngle) {
-    moveBase(baseAngle);
-    moveShoulder(shoulderAngle);
-    moveElbow(elbowAngle);
-    moveWrist(wristAngle);
-    moveHand(handAngle);
-}
-
-void drawCircle() {
-
-    moveBase(90); 
-    moveElbow(130);
-    moveShoulder(40);
-    closeGripper(); 
-    
-    for (int i = 0; i < 360; i += 10) {
-        moveBase(100 + sin(i * PI / 180) * 20);
-        moveShoulder(50 + cos(i * PI / 180) * 5);
-    }
-}
-
-void drawSquare() {
-  
-  int baseCenter = 90;  // Center position for the base
-  int shoulderCenter = 70;  // Center position for the shoulder
-  int sideLength = 30;  // Length of each side of the square
-
-  // Move to the starting corner of the square
-  moveBase(baseCenter - sideLength / 2);
-  moveShoulder(shoulderCenter - sideLength / 2);
+void grab() {
+  moveShoulder(90);//90
+  moveElbow(130);
+  moveWrist(60);
+  delay(200);
+  moveHand(180);
+  openGripper();
+  moveElbow(150);
+  moveShoulder(50);
+  moveWrist(80);
+  moveElbow(160);
+  delay(500);
   closeGripper();
-
-  // Draw all four sides of the square, alternating horizontal and vertical lines
-  for (int i = 0; i < 4; i++) {
-    
-    if (i % 2 == 0) {
-      // Horizontal side
-      for (int j = 0; j < sideLength; j++) {
-        moveBase(baseCenter - sideLength / 2 + j);
-        delay(50); // Adjust delay for drawing speed
-      }
-    } else {
-      // Vertical side
-      for (int j = 0; j < sideLength; j++) {
-        moveShoulder(shoulderCenter - sideLength / 2 + j);
-        delay(50); // Adjust delay for drawing speed
-      }
-    }
-
-    // Turn 90 degrees to start the next side
-    moveShoulder(shoulderCenter + sideLength / 2);  // This ensures both horizontal and vertical turns
-    delay(500);
-  }
+  delay(500);
+  moveInitialPosition();
+  delay(300);
+  moveBase(60);
+  moveShoulder(100);
+  moveWrist(30);
+  moveHand(90);
+  delay(1000);
+  openGripper();
+  delay(1000);
   moveInitialPosition();
 }
