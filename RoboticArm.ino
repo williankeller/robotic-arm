@@ -169,6 +169,8 @@ void setServoPosition(ArmPart &part, int targetAngle) {
     Serial.print(part.pin);
     Serial.print(": ");
     Serial.print(part.name);
+    Serial.print(", Current: ");
+    Serial.print(currentAngle);
     Serial.print(", Angle: ");
     Serial.println(targetAngle);
 }
