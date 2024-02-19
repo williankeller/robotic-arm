@@ -1,6 +1,10 @@
 #include <Wire.h>
 #include <Servo.h>
 #include <math.h>
+#include "HUSKYLENS.h"
+#include "SoftwareSerial.h"
+
+HUSKYLENS huskylens;
 
 // Define PI for trigonometric calculations
 #define PI 3.14159265358979323846
@@ -38,6 +42,15 @@ RobotArm arm = {
 void setup() {
     Serial.begin(9600);
 
+    Wire.begin();
+    while (!huskylens.begin(Wire))
+    {
+        Serial.println(F("Begin failed!"));
+        Serial.println(F("1.Please recheck the \"Protocol Type\" in HUSKYLENS (General Settings>>Protocol Type>>I2C)"));
+        Serial.println(F("2.Please recheck the connection."));
+        delay(100);
+    }
+
     // Attach each servo to its corresponding pin
     arm.base.servo.attach(arm.base.pin);
     arm.shoulder.servo.attach(arm.shoulder.pin);
@@ -51,12 +64,58 @@ void setup() {
     openGripper();
 }
 
+// Initial servo positions
+int currentHorizontalPos = 90; // Middle position for horizontal servo
+int currentVerticalPos = 160;   // Middle position for vertical servo
+
 void loop() {
+    if (!huskylens.request()) {
+        Serial.println(F("Fail to request data from HUSKYLENS, recheck the connection!"));
+    } else if (!huskylens.isLearned()) {
+        Serial.println(F("Nothing learned, press learn button on HUSKYLENS to learn one!"));
+    } else {
+        while (huskylens.available()) {
+            HUSKYLENSResult result = huskylens.read();
+
+            // Horizontal movement
+            if (result.xCenter > 190) { // Object is on the right
+                currentHorizontalPos -= 2; // Move servo left
+            } else if (result.xCenter < 130) { // Object is on the left
+                currentHorizontalPos += 2; // Move servo right
+            }
+            
+            // Vertical movement
+            if (result.yCenter > 150) { // Object is at the bottom
+                currentVerticalPos += 2; // Move servo down
+            } else if (result.yCenter < 60) { // Object is at the top
+                currentVerticalPos -= 2; // Move servo up
+            }
+            
+            // Update servo positions with constraints
+            currentHorizontalPos = constrain(currentHorizontalPos, 30, 150);
+            currentVerticalPos = constrain(currentVerticalPos, 0, 180);
+            
+            moveBase(currentHorizontalPos);
+
+            if (currentVerticalPos < 90) {
+                moveShoulder(180 - currentVerticalPos);
+            } else {
+                moveShoulder(currentVerticalPos);
+            }
+
+            moveElbow(currentVerticalPos);
+        }
+    }   
 
     // Check if data is available to read from the serial buffer
     if (Serial.available() > 0) {
         // Read the incoming string until a newline is received
         String data = Serial.readStringUntil('\n');
+
+        if (data.startsWith("reset")) {
+            moveInitialPosition();
+            currentVerticalPos = 130;
+        }
 
         if (data.startsWith("base")) {
             int angle = data.substring(5).toInt();
