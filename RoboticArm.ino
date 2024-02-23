@@ -30,14 +30,13 @@ struct RobotArm {
 
 // Initialize the arm (part name, pin on the board, min angle, max angle)
 RobotArm arm = {
-    {"base",     3, 30, 150}, // base, pin, min, max
+    {"base",     3, 35, 150}, // base, pin, min, max
     {"shoulder", 5, 0, 180},  // shoulder, pin, min, max
-    {"elbow",    6, 0, 180},  // elbow, pin, min, max
-    {"wrist",    9, 0, 180},  // wrist, pin, min, max
+    {"elbow",    6, 0, 140},  // elbow, pin, min, max
+    {"wrist",    9, 89, 180}, // wrist, pin, min (temporary 89 value), max
     {"hand",     10, 0, 180}, // hand, pin, min, max
     {"gripper",  11, 0, 98}   // gripper, pin, min, max
 };
-
 
 void setup() {
     Serial.begin(9600);
@@ -69,45 +68,10 @@ int currentHorizontalPos = 90; // Middle position for horizontal servo
 int currentVerticalPos = 160;   // Middle position for vertical servo
 
 void loop() {
-    if (!huskylens.request()) {
-        Serial.println(F("Fail to request data from HUSKYLENS, recheck the connection!"));
-    } else if (!huskylens.isLearned()) {
-        Serial.println(F("Nothing learned, press learn button on HUSKYLENS to learn one!"));
-    } else {
-        while (huskylens.available()) {
-            HUSKYLENSResult result = huskylens.read();
-
-            // Horizontal movement
-            if (result.xCenter > 190) { // Object is on the right
-                currentHorizontalPos -= 2; // Move servo left
-            } else if (result.xCenter < 130) { // Object is on the left
-                currentHorizontalPos += 2; // Move servo right
-            }
-            
-            // Vertical movement
-            if (result.yCenter > 150) { // Object is at the bottom
-                currentVerticalPos += 2; // Move servo down
-            } else if (result.yCenter < 60) { // Object is at the top
-                currentVerticalPos -= 2; // Move servo up
-            }
-            
-            // Update servo positions with constraints
-            currentHorizontalPos = constrain(currentHorizontalPos, 30, 150);
-            currentVerticalPos = constrain(currentVerticalPos, 0, 180);
-            
-            moveBase(currentHorizontalPos);
-
-            if (currentVerticalPos < 90) {
-                moveShoulder(180 - currentVerticalPos);
-            } else {
-                moveShoulder(currentVerticalPos);
-            }
-
-            moveElbow(currentVerticalPos);
-        }
-    }   
-
-    // Check if data is available to read from the serial buffer
+    //if (!huskylens.request()) {
+    //    Serial.println(F("Fail to request data from HUSKYLENS, recheck the connection!"));
+    //} else if (!huskylens.isLearned()) {
+    //    Serial.println(F("Nothing learned, press learn button on HUSKYLENS to learn one!"));
     if (Serial.available() > 0) {
         // Read the incoming string until a newline is received
         String data = Serial.readStringUntil('\n');
@@ -146,13 +110,15 @@ void loop() {
             int value = data.substring(8).toInt();
             if (value == 1) {
                 closeGripper();
-            } else {
+            } else if (value == 1) {
                 openGripper();
+            } else {
+                moveGripper(value);
             }
         }
 
         if (data.startsWith("grab")) {
-          grab();
+            grab();
         }
 
         if (data.startsWith("position")) {
@@ -167,6 +133,40 @@ void loop() {
             moveToPosition(x, y, z);
         }
     }
+    else {
+        while (huskylens.available()) {
+            HUSKYLENSResult result = huskylens.read();
+
+            // Horizontal movement
+            if (result.xCenter > 190) { // Object is on the right
+                currentHorizontalPos -= 2; // Move servo left
+            } else if (result.xCenter < 130) { // Object is on the left
+                currentHorizontalPos += 2; // Move servo right
+            }
+            
+            // Vertical movement
+            if (result.yCenter > 150) { // Object is at the bottom
+                currentVerticalPos += 2; // Move servo down
+            } else if (result.yCenter < 60) { // Object is at the top
+                currentVerticalPos -= 1.5; // Move servo up
+            }
+            
+            // Update servo positions with constraints
+            currentHorizontalPos = constrain(currentHorizontalPos, 30, 150);
+            currentVerticalPos = constrain(currentVerticalPos, 0, 180);
+            
+            moveBase(currentHorizontalPos);
+
+            if (currentVerticalPos < 90) {
+                moveShoulder(180 - currentVerticalPos);
+            } else {
+                moveShoulder(currentVerticalPos);
+            }
+
+            moveElbow(currentVerticalPos);
+        }
+    }   
+
 }
 
 // Function to set the servo angle
@@ -204,7 +204,7 @@ void setServoPosition(ArmPart &part, int targetAngle) {
 void moveInitialPosition() {
     moveBase(90);
     moveShoulder(130);
-    moveElbow(160);
+    moveElbow(90);
     moveWrist(90);
     moveHand(90);
 }
@@ -227,6 +227,10 @@ void moveWrist(int angle) {
 
 void moveHand(int angle) {
     setServoPosition(arm.hand, angle);
+}
+
+void moveGripper(int angle) {
+    setServoPosition(arm.gripper, angle);
 }
 
 void closeGripper() {
