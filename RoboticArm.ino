@@ -1,8 +1,8 @@
 #include <Wire.h>
 #include <Servo.h>
-#include <math.h>
 #include "HUSKYLENS.h"
 #include "SoftwareSerial.h"
+#include "InverseKinematics.h"
 
 HUSKYLENS huskylens;
 
@@ -128,9 +128,10 @@ void loop() {
             float x = data.substring(9, firstComma).toFloat();
             float y = data.substring(firstComma + 1, secondComma).toFloat();
             float z = data.substring(secondComma + 1).toFloat();
+            float gripAngle = data.substring(secondComma + 1).toFloat();
 
             // Move the arm to the specified position
-            moveToPosition(x, y, z);
+            moveToPosition(x, y, z, gripAngle);
         }
     }
     else {
@@ -162,7 +163,6 @@ void loop() {
             } else {
                 moveShoulder(currentVerticalPos);
             }
-
             moveElbow(currentVerticalPos);
         }
     }   
@@ -205,7 +205,7 @@ void moveInitialPosition() {
     moveBase(90);
     moveShoulder(130);
     moveElbow(90);
-    moveWrist(90);
+    moveWrist(120);
     moveHand(90);
 }
 
@@ -267,20 +267,34 @@ void grab() {
     moveInitialPosition();
 }
 
-// Pseudocode for an inverse kinematics function
-void moveToPosition(float x, float y, float z) {
-    // Calculate each servo angle required to reach (x, y, z)
-    int baseAngle = calculateBaseAngle(x, y);
-    int shoulderAngle = calculateShoulderAngle(x, y, z);
-    int elbowAngle = calculateElbowAngle(x, y, z, shoulderAngle);
-    int wristAngle = calculateWristAngle(shoulderAngle, elbowAngle);
+void moveToPosition(float x, float y, float z, float gripAngle) {
+    float baseAngle, r, shoulderAngle, elbowAngle, wristAngle;
+    
+    solveXYZ(x, y, baseAngle, r);
+    solveRZ(r, z, gripAngle, shoulderAngle, elbowAngle, wristAngle);
+    
+    // Convert radians to degrees for servo positioning
+    int currentBaseAngle = arm.base.servo.read();
+    int currentShoulderAngle = arm.shoulder.servo.read();
+    int currentElbowAngle = arm.elbow.servo.read();
+    int currentWristAngle = arm.wrist.servo.read();
 
-    // Use existing functions to move each part
-    //moveBase(baseAngle);
-    moveShoulder(shoulderAngle);
-    moveElbow(elbowAngle);
-    moveWrist(wristAngle);
-    // Hand and gripper movements can be adjusted based on the task
+    baseAngle += currentBaseAngle + 2;
+    shoulderAngle += currentShoulderAngle + 2;
+    elbowAngle += currentElbowAngle + 2;
+    wristAngle += currentWristAngle + 2;
+
+
+    // Move the arm to the specified position
+    moveBase(radiansToDegrees(baseAngle));
+    moveShoulder(radiansToDegrees(shoulderAngle));
+    moveElbow(radiansToDegrees(elbowAngle));
+    moveWrist(radiansToDegrees(wristAngle));
+}
+
+// Convert radians to degrees
+float radiansToDegrees(float radians) {
+    return radians * 180 / PI;
 }
 
 int calculateBaseAngle(float x, float y) {
