@@ -1,6 +1,13 @@
 #include <Wire.h>
 #include <Servo.h>
-#include <Ramp.h>
+#include "HUSKYLENS.h"
+#include "SoftwareSerial.h"
+#include "InverseKinematics.h"
+
+HUSKYLENS huskylens;
+
+// Define PI for trigonometric calculations
+#define PI 3.14159265358979323846
 
 // Define a structure for each part of the arm
 struct ArmPart {
@@ -13,27 +20,35 @@ struct ArmPart {
 
 // Define a structure for the robot arm
 struct RobotArm {
-    ArmPart base;       // Base - Turns 180° on its axis (left to right)
-    ArmPart shoulder;   // Shoulder - First part of the arm 
-    ArmPart elbow;      // Elbow - Second junction of the arm
-    ArmPart wrist;      // Wrist - Third junction of the arm
-    ArmPart hand;       // Hand - Rotates the wrist 180° on its axis on its axis
-    ArmPart gripper;    // Gripper - Grasps objects
+    ArmPart base;     // Base to Shoulder is 81mm Turns 180° on its axis
+    ArmPart shoulder; // Shoulder joint to Elbow joint is 104mm
+    ArmPart elbow;    // Elbow joint to the Wrist joint is 96 mm
+    ArmPart wrist;    // Wrist joint to the Gripper point is 125mm
+    ArmPart hand;     // Hand 130mm - Rotates the wrist 180° on its axis
+    ArmPart gripper;  // Gripper max open 58mm
 };
 
 // Initialize the arm (part name, pin on the board, min angle, max angle)
 RobotArm arm = {
-    {"base",     3, 30, 150}, // base, pin, min, max
+    {"base",     3, 35, 150}, // base, pin, min, max
     {"shoulder", 5, 0, 180},  // shoulder, pin, min, max
-    {"elbow",    6, 0, 180},  // elbow, pin, min, max
-    {"wrist",    9, 0, 180},  // wrist, pin, min, max
+    {"elbow",    6, 0, 140},  // elbow, pin, min, max
+    {"wrist",    9, 89, 180}, // wrist, pin, min (temporary 89 value), max
     {"hand",     10, 0, 180}, // hand, pin, min, max
     {"gripper",  11, 0, 98}   // gripper, pin, min, max
 };
 
-
 void setup() {
     Serial.begin(9600);
+
+    Wire.begin();
+    while (!huskylens.begin(Wire))
+    {
+        Serial.println(F("Begin failed!"));
+        Serial.println(F("1.Please recheck the \"Protocol Type\" in HUSKYLENS (General Settings>>Protocol Type>>I2C)"));
+        Serial.println(F("2.Please recheck the connection."));
+        delay(100);
+    }
 
     // Attach each servo to its corresponding pin
     arm.base.servo.attach(arm.base.pin);
@@ -48,12 +63,23 @@ void setup() {
     openGripper();
 }
 
-void loop() {
+// Initial servo positions
+int currentHorizontalPos = 90; // Middle position for horizontal servo
+int currentVerticalPos = 160;   // Middle position for vertical servo
 
-    // Check if data is available to read from the serial buffer
+void loop() {
+    //if (!huskylens.request()) {
+    //    Serial.println(F("Fail to request data from HUSKYLENS, recheck the connection!"));
+    //} else if (!huskylens.isLearned()) {
+    //    Serial.println(F("Nothing learned, press learn button on HUSKYLENS to learn one!"));
     if (Serial.available() > 0) {
         // Read the incoming string until a newline is received
         String data = Serial.readStringUntil('\n');
+
+        if (data.startsWith("reset")) {
+            moveInitialPosition();
+            currentVerticalPos = 130;
+        }
 
         if (data.startsWith("base")) {
             int angle = data.substring(5).toInt();
@@ -84,15 +110,63 @@ void loop() {
             int value = data.substring(8).toInt();
             if (value == 1) {
                 closeGripper();
-            } else {
+            } else if (value == 1) {
                 openGripper();
+            } else {
+                moveGripper(value);
             }
         }
 
         if (data.startsWith("grab")) {
-          grab();
+            grab();
+        }
+
+        if (data.startsWith("position")) {
+            // Extract the x, y, z coordinates from the string
+            int firstComma = data.indexOf(',');
+            int secondComma = data.indexOf(',', firstComma + 1);
+            float x = data.substring(9, firstComma).toFloat();
+            float y = data.substring(firstComma + 1, secondComma).toFloat();
+            float z = data.substring(secondComma + 1).toFloat();
+            float gripAngle = data.substring(secondComma + 1).toFloat();
+
+            // Move the arm to the specified position
+            moveToPosition(x, y, z, gripAngle);
         }
     }
+    else {
+        while (huskylens.available()) {
+            HUSKYLENSResult result = huskylens.read();
+
+            // Horizontal movement
+            if (result.xCenter > 190) { // Object is on the right
+                currentHorizontalPos -= 2; // Move servo left
+            } else if (result.xCenter < 130) { // Object is on the left
+                currentHorizontalPos += 2; // Move servo right
+            }
+            
+            // Vertical movement
+            if (result.yCenter > 150) { // Object is at the bottom
+                currentVerticalPos += 2; // Move servo down
+            } else if (result.yCenter < 60) { // Object is at the top
+                currentVerticalPos -= 1.5; // Move servo up
+            }
+            
+            // Update servo positions with constraints
+            currentHorizontalPos = constrain(currentHorizontalPos, 30, 150);
+            currentVerticalPos = constrain(currentVerticalPos, 0, 180);
+            
+            moveBase(currentHorizontalPos);
+
+            if (currentVerticalPos < 90) {
+                moveShoulder(180 - currentVerticalPos);
+            } else {
+                moveShoulder(currentVerticalPos);
+            }
+            moveElbow(currentVerticalPos);
+        }
+    }   
+
 }
 
 // Function to set the servo angle
@@ -130,8 +204,8 @@ void setServoPosition(ArmPart &part, int targetAngle) {
 void moveInitialPosition() {
     moveBase(90);
     moveShoulder(130);
-    moveElbow(160);
-    moveWrist(90);
+    moveElbow(90);
+    moveWrist(120);
     moveHand(90);
 }
 
@@ -155,6 +229,10 @@ void moveHand(int angle) {
     setServoPosition(arm.hand, angle);
 }
 
+void moveGripper(int angle) {
+    setServoPosition(arm.gripper, angle);
+}
+
 void closeGripper() {
     setServoPosition(arm.gripper, 180);
 }
@@ -164,27 +242,197 @@ void openGripper() {
 }
 
 void grab() {
-  moveShoulder(90);//90
-  moveElbow(130);
-  moveWrist(60);
-  delay(200);
-  moveHand(180);
-  openGripper();
-  moveElbow(150);
-  moveShoulder(50);
-  moveWrist(80);
-  moveElbow(160);
-  delay(500);
-  closeGripper();
-  delay(500);
-  moveInitialPosition();
-  delay(300);
-  moveBase(60);
-  moveShoulder(100);
-  moveWrist(30);
-  moveHand(90);
-  delay(1000);
-  openGripper();
-  delay(1000);
-  moveInitialPosition();
+    moveShoulder(90);//90
+    moveElbow(130);
+    moveWrist(60);
+    delay(200);
+    moveHand(180);
+    openGripper();
+    moveElbow(150);
+    moveShoulder(50);
+    moveWrist(80);
+    moveElbow(160);
+    delay(500);
+    closeGripper();
+    delay(500);
+    moveInitialPosition();
+    delay(300);
+    moveBase(60);
+    moveShoulder(100);
+    moveWrist(30);
+    moveHand(90);
+    delay(1000);
+    openGripper();
+    delay(1000);
+    moveInitialPosition();
+}
+
+void moveToPosition(float x, float y, float z, float gripAngle) {
+    float baseAngle, r, shoulderAngle, elbowAngle, wristAngle;
+    
+    solveXYZ(x, y, baseAngle, r);
+    solveRZ(r, z, gripAngle, shoulderAngle, elbowAngle, wristAngle);
+    
+    // Convert radians to degrees for servo positioning
+    int currentBaseAngle = arm.base.servo.read();
+    int currentShoulderAngle = arm.shoulder.servo.read();
+    int currentElbowAngle = arm.elbow.servo.read();
+    int currentWristAngle = arm.wrist.servo.read();
+
+    baseAngle += currentBaseAngle + 2;
+    shoulderAngle += currentShoulderAngle + 2;
+    elbowAngle += currentElbowAngle + 2;
+    wristAngle += currentWristAngle + 2;
+
+
+    // Move the arm to the specified position
+    moveBase(radiansToDegrees(baseAngle));
+    moveShoulder(radiansToDegrees(shoulderAngle));
+    moveElbow(radiansToDegrees(elbowAngle));
+    moveWrist(radiansToDegrees(wristAngle));
+}
+
+// Convert radians to degrees
+float radiansToDegrees(float radians) {
+    return radians * 180 / PI;
+}
+
+int calculateBaseAngle(float x, float y) {
+    // Calculate the direction angle in radians
+    float angleRadians = atan2(y, x);
+
+    float piAngle = (180.0 / PI);
+
+    // Convert radians to degrees
+    float angleDegrees = angleRadians * piAngle;
+
+    Serial.print("Base: X, Y: ");
+    Serial.print(x);
+    Serial.print(", ");
+    Serial.print(y);
+    Serial.print("; Radians: ");
+    Serial.print(angleRadians);
+    Serial.print("; PI Angle: ");
+    Serial.print(piAngle);
+    Serial.print("; Degrees: ");
+    Serial.println(angleDegrees);
+
+    return angleDegrees;
+}
+
+int calculateShoulderAngle(float x, float y, float z) {
+    // Calculate the planar distance from the base to the target point
+    float distance = sqrt(x * x + y * y);
+
+    // Height from the base to the target point
+    float height = z - 81; // Assuming 81mm is the height of the base to the shoulder joint
+
+    // Calculate the distance from the shoulder joint to the target point
+    float hypotenuse = sqrt(distance * distance + height * height);
+
+    float shoulderLength = 104.00; // Shoulder to elbow
+    float elbowLength = 97.00; // Elbow to wrist (excluding the wrist to gripper length)
+
+    // Ensure the argument for acos is within the valid range [-1, 1]
+    float acosArgument = (shoulderLength * shoulderLength + hypotenuse * hypotenuse - elbowLength * elbowLength) / (2 * shoulderLength * hypotenuse);
+    acosArgument = max(min(acosArgument, 1.0f), -1.0f);
+
+    // Calculate the angle between the shoulder and the hypotenuse
+    float angle = acos(acosArgument);
+
+    // Convert radians to degrees
+    int angleDegrees = angle * (180.0 / PI);
+
+    int shoulderServoAngle;
+    // Adjust these conditions based on servo offset and geometry.
+    if (z > 200) {
+        shoulderServoAngle = 90 + (z - 200) / 2;
+    } else if (z < 200) {
+        shoulderServoAngle = 90 - (200 - z) / 2;
+    } else {
+        shoulderServoAngle = 90;
+    }
+
+    // Debugging Output
+    Serial.print("Shoulder: X, Y, Z: ");
+    Serial.print(x);
+    Serial.print(", ");
+    Serial.print(y);
+    Serial.print(", ");
+    Serial.print(z);
+    Serial.print("; Distance: ");
+    Serial.print(distance);
+    Serial.print("; Height: ");
+    Serial.print(height);
+    Serial.print("; Hypotenuse: ");
+    Serial.print(hypotenuse);
+    Serial.print("; Acos Argument: ");
+    Serial.print(acosArgument);
+    Serial.print("; Angle (rad): ");
+    Serial.print(angle);
+    Serial.print("; Degrees: ");
+    Serial.print(angleDegrees);
+    Serial.print("; Final Angle: ");
+    Serial.println(shoulderServoAngle);
+
+    return shoulderServoAngle;
+}
+
+int calculateElbowAngle(float x, float y, float z, int shoulderAngle) {
+    // Calculate the planar distance from the base to the target point
+    float distance = sqrt(x * x + y * y);
+
+    // Height from the base to the target point
+    float height = z - 81; // Assuming 81mm is the height of the base to the shoulder joint
+
+    // Calculate the distance from the shoulder joint to the target point
+    float hypotenuse = sqrt(distance * distance + height * height);
+
+    float shoulderLength = 104.00; // Shoulder to elbow
+    float elbowLength = 97.00; // Elbow to wrist (excluding the wrist to gripper length)
+
+    // Use the law of cosines to calculate the elbow joint angle
+    float acosArgument = (shoulderLength * shoulderLength + elbowLength * elbowLength - hypotenuse * hypotenuse) / (2 * shoulderLength * elbowLength);
+    acosArgument = max(min(acosArgument, 1.0f), -1.0f); // Ensure the argument is within the valid range [-1, 1]
+
+    // Calculate the elbow joint angle
+    float elbowJointAngle = acos(acosArgument);
+
+    // Convert radians to degrees
+    int angleDegrees = elbowJointAngle * (180.0 / PI);
+
+    // Debugging Output
+    Serial.print("Elbow: X, Y, Z: ");
+    Serial.print(x);
+    Serial.print(", ");
+    Serial.print(y);
+    Serial.print(", ");
+    Serial.print(z);
+    Serial.print("; Distance: ");
+    Serial.print(distance);
+    Serial.print("; Height: ");
+    Serial.print(height);
+    Serial.print("; Hypotenuse: ");
+    Serial.print(hypotenuse);
+    Serial.print("; Shoulder-Elbow Angle (rad): ");
+    Serial.print(elbowJointAngle);
+    Serial.print("; Degrees: ");
+    Serial.println(angleDegrees);
+
+    return angleDegrees;
+}
+
+int calculateWristAngle(int shoulderAngle, int elbowAngle) {
+    // Calculate the wrist angle based on the shoulder and elbow angles
+    int wristAngle = 180 - shoulderAngle - elbowAngle;
+
+    // Debugging Output
+    Serial.print("Wrist: Shoulder Angle: ");
+    Serial.print(shoulderAngle);
+    Serial.print("; Elbow Angle: ");
+    Serial.print(elbowAngle);
+    Serial.print("; Wrist Angle: ");
+    Serial.println(wristAngle);
+
+    return wristAngle;
 }
