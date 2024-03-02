@@ -1,13 +1,5 @@
 #include "Servos.h"
 
-void moveInitialPosition() {
-    moveBase(90);
-    moveShoulder(140);
-    moveElbow(100);
-    moveWrist(135);
-    moveHand(90);
-}
-
 void moveBase(int angle) {
     setServoPosition(arm.base, angle);
 }
@@ -40,6 +32,13 @@ void openGripper() {
     setServoPosition(arm.gripper, 0);
 }
 
+void moveInitialPosition() {
+    moveBase(90);
+    moveShoulder(140);
+    moveElbow(100);
+    moveWrist(135);
+    moveHand(90);
+}
 
 void grab() {
     moveShoulder(90);//90

@@ -3,44 +3,12 @@
 #include "HUSKYLENS.h"
 #include "SoftwareSerial.h"
 #include "InverseKinematics.h"
-#include "RobotArm.h"
-
-RobotArm arm;
+#include "Movements.h"
 
 HUSKYLENS huskylens;
 
 // Define PI for trigonometric calculations
 #define PI 3.14159265358979323846
-
-// Define a structure for each part of the arm
-struct ArmPart {
-    String name;
-    int pin;
-    int minAngle;
-    int maxAngle;
-    int defaultAngle;
-    Servo servo;  // Servo object for each part
-};
-
-// Define a structure for the robot arm
-struct RobotArm {
-    ArmPart base;     // Base to Shoulder is 81mm Turns 180° on its axis
-    ArmPart shoulder; // Shoulder joint to Elbow joint is 104mm
-    ArmPart elbow;    // Elbow joint to the Wrist joint is 96 mm
-    ArmPart wrist;    // Wrist joint to the Gripper point is 125mm
-    ArmPart hand;     // Hand 130mm - Rotates the wrist 180° on its axis
-    ArmPart gripper;  // Gripper max open 58mm
-};
-
-// Initialize the arm (part name, pin on the board, min angle, max angle, default angle)
-RobotArm arm = {
-    {"base",     3, 35, 150, 90},
-    {"shoulder", 5, 0, 180, 140},
-    {"elbow",    6, 0, 140, 100},
-    {"wrist",    9, 89, 180, 135},
-    {"hand",     10, 0, 180, 90},
-    {"gripper",  11, 20, 98, 98}
-};
 
 void setup() {
     Serial.begin(9600);
@@ -55,16 +23,7 @@ void setup() {
     }
 
     // Attach each servo to its corresponding pin
-    arm.base.servo.attach(arm.base.pin);
-    arm.shoulder.servo.attach(arm.shoulder.pin);
-    arm.elbow.servo.attach(arm.elbow.pin);
-    arm.wrist.servo.attach(arm.wrist.pin);
-    arm.hand.servo.attach(arm.hand.pin);
-    arm.gripper.servo.attach(arm.gripper.pin);
-
-    // Move the arm to its initial position
-    moveInitialPosition();
-    openGripper();
+    attachServos();
 }
 
 // Initial servo position for the base
@@ -151,11 +110,11 @@ void loop() {
             // Horizontal movement
             if (result.xCenter > 190) { // Object is on the right
                 currentHorizontalPos -= 2; // Move servo left
-                handCurrentPos += 2;
+                handCurrentPos += 1;
                 
             } else if (result.xCenter < 130) { // Object is on the left
                 currentHorizontalPos += 2; // Move servo right
-                handCurrentPos -= 2;
+                handCurrentPos -= 1;
             }
             
             // Vertical movement
@@ -167,86 +126,48 @@ void loop() {
                 shoulderCurrentPos -= 1.5;
                 elbowCurrentPos -= 3;
             }
-            
+
+            // Get the distance from the object
+            float width = result.width;
+            float height = result.height;
+            float distance = 0.0;
+
+            // Calculate distance using the width and height of the object
+            if (width > height) {
+                distance = 0.5 * 3.3 * 480 / width;
+            } else {
+                distance = 0.5 * 3.3 * 480 / height;
+            }
+            Serial.print("----- Distance: ");
+            Serial.print("W: ");
+            Serial.print(width);
+            Serial.print(", H: ");
+            Serial.print(height);
+            Serial.print(", D: ");
+            Serial.println(distance);
+
+            // Store the original position of the arm
+            int originalShoulderPos = shoulderCurrentPos;
+            int originalElbowPos = elbowCurrentPos;
+            int originalWristPos = wristCurrentPos;
+
+            if (distance < 6) {
+                // Object is too close, move the arm back
+                shoulderCurrentPos += 2;
+                elbowCurrentPos -= 2;
+                wristCurrentPos += 2;
+            } else if (distance > 7) {
+                // Move the arm back to the original position
+                shoulderCurrentPos = originalShoulderPos;
+                elbowCurrentPos = originalElbowPos;
+                wristCurrentPos = originalWristPos;
+            }
             moveBase(currentHorizontalPos);
-
             moveShoulder(shoulderCurrentPos);
-
-            moveElbow(elbowCurrentPos); 
+            moveElbow(elbowCurrentPos);
+            moveWrist(wristCurrentPos);
         }
     }
-}
-
-// Function to set the servo angle
-void setServoPosition(ArmPart &part, int targetAngle) {
-    targetAngle = constrain(targetAngle, part.minAngle, part.maxAngle); // Constrain the target angle within limits
-
-    // Read the current position of the servo
-    int currentAngle = part.servo.read();
-
-    // Define the step size for smoother movement
-    int stepSize = 1;
-
-    if (currentAngle < targetAngle) {
-        for (int pos = currentAngle; pos < targetAngle; pos += stepSize) {
-            part.servo.write(pos); // Move to the next position
-            delay(15); // Wait for 15ms to slow down the movement
-        }
-    } else {
-        for (int pos = currentAngle; pos > targetAngle; pos -= stepSize) {
-            part.servo.write(pos); // Move to the next position
-            delay(15); // Wait for 15ms to slow down the movement
-        }
-    }
-    // For debugging
-    Serial.print("Pin: ");
-    Serial.print(part.pin);
-    Serial.print(": ");
-    Serial.print(part.name);
-    Serial.print(", Current: ");
-    Serial.print(currentAngle);
-    Serial.print(", Angle: ");
-    Serial.println(targetAngle);
-}
-
-void moveInitialPosition() {
-    moveBase(90);
-    moveShoulder(140);
-    moveElbow(100);
-    moveWrist(135);
-    moveHand(90);
-}
-
-void moveBase(int angle) {
-    setServoPosition(arm.base, angle);
-}
-
-void moveShoulder(int angle) {
-    setServoPosition(arm.shoulder, angle);
-}
-
-void moveElbow(int angle) {
-    setServoPosition(arm.elbow, angle);
-}
-
-void moveWrist(int angle) {
-    setServoPosition(arm.wrist, angle);
-}
-
-void moveHand(int angle) {
-    setServoPosition(arm.hand, angle);
-}
-
-void moveGripper(int angle) {
-    setServoPosition(arm.gripper, angle);
-}
-
-void closeGripper() {
-    setServoPosition(arm.gripper, 180);
-}
-
-void openGripper() {
-    setServoPosition(arm.gripper, 0);
 }
 
 
