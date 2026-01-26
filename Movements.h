@@ -32,36 +32,55 @@ void openGripper() {
     setServoPosition(arm.gripper, 0);
 }
 
+// Move to initial position with all joints synchronized
 void moveInitialPosition() {
-    moveBase(90);
-    moveShoulder(140);
-    moveElbow(100);
-    moveWrist(135);
-    moveHand(90);
+    ArmPart *parts[] = {&arm.base, &arm.shoulder, &arm.elbow, &arm.wrist, &arm.hand};
+    int targets[] = {90, 140, 100, 135, 90};
+    moveJointsSynchronized(parts, targets, 5);
 }
 
+// Coordinated grab sequence using synchronized multi-joint movements
 void grab() {
-    moveShoulder(90);//90
-    moveElbow(130);
-    moveWrist(60);
+    // Phase 1: Move arm to pre-grab posture (shoulder + elbow + wrist together)
+    {
+        ArmPart *parts[] = {&arm.shoulder, &arm.elbow, &arm.wrist};
+        int targets[] = {90, 130, 60};
+        moveJointsSynchronized(parts, targets, 3);
+    }
     delay(200);
+
+    // Phase 2: Rotate hand and open gripper
     moveHand(180);
     openGripper();
-    moveElbow(150);
-    moveShoulder(50);
-    moveWrist(80);
-    moveElbow(160);
+
+    // Phase 3: Extend arm to reach object (shoulder + elbow + wrist together)
+    {
+        ArmPart *parts[] = {&arm.shoulder, &arm.elbow, &arm.wrist};
+        int targets[] = {50, 160, 80};
+        moveJointsSynchronized(parts, targets, 3);
+    }
     delay(500);
+
+    // Phase 4: Grip the object
     closeGripper();
     delay(500);
+
+    // Phase 5: Lift to safe position
     moveInitialPosition();
     delay(300);
-    moveBase(60);
-    moveShoulder(100);
-    moveWrist(30);
-    moveHand(90);
+
+    // Phase 6: Move to drop position (base + shoulder + wrist + hand together)
+    {
+        ArmPart *parts[] = {&arm.base, &arm.shoulder, &arm.wrist, &arm.hand};
+        int targets[] = {60, 100, 30, 90};
+        moveJointsSynchronized(parts, targets, 4);
+    }
     delay(1000);
+
+    // Phase 7: Release object
     openGripper();
     delay(1000);
+
+    // Phase 8: Return to initial position
     moveInitialPosition();
 }
