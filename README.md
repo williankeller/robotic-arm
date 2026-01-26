@@ -1,5 +1,42 @@
 # Robotic Arm (6 DOF)
 
+An Arduino-based 6 degrees-of-freedom robotic arm with serial command control, inverse kinematics positioning, and optional HuskyLens vision tracking.
+
+## Serial Commands
+
+Connect via Serial Monitor at **9600 baud** with **Newline** line ending. Send `help` to list all commands.
+
+### Joint Control
+
+| Command | Description | Range |
+|---------|-------------|-------|
+| `base <angle>` | Rotate base | 35–150° |
+| `shoulder <angle>` | Move shoulder | 0–180° |
+| `elbow <angle>` | Move elbow | 0–140° |
+| `wrist <angle>` | Move wrist | 89–180° |
+| `hand <angle>` | Rotate hand | 0–180° |
+| `gripper <0\|1\|angle>` | 0 = open, 1 = close, or specific angle | 20–90° |
+
+### Sequences & Positioning
+
+| Command | Description |
+|---------|-------------|
+| `reset` | Return all joints to home position |
+| `grab` | Run full pick-and-place sequence |
+| `position x,y,z,gripAngle` | Move to Cartesian position using inverse kinematics (mm, radians) |
+
+### Vision Tracking
+
+HuskyLens is **optional**. The arm starts in manual mode and accepts serial commands without HuskyLens connected. Use the `tracking` command to enable auto tracking at runtime.
+
+| Command | Description |
+|---------|-------------|
+| `tracking on` | Enable HuskyLens auto tracking (retries connection if needed) |
+| `tracking off` | Disable tracking and return to home position |
+| `tracking` | Show current tracking status |
+
+## Arm Geometry
+
 - The height of the shoulder joint is **81mm** _(The base turns 180° on its axis left to right - 90° is the center)_;
 - The length of the shoulder joint _(shoulder joint to elbow joint)_ is **104mm**;
 - The length of the elbow joint _(elbow joint to wrist joint)_ is **96mm**;
