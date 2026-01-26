@@ -34,6 +34,7 @@ int wristCurrentPos = arm.wrist.defaultAngle;
 int handCurrentPos = arm.hand.defaultAngle;
 
 void loop() {
+
     if (!huskylens.request()) {
         Serial.println(F("Fail to request data from HUSKYLENS, recheck the connection!"));
     } else if (!huskylens.isLearned()) {

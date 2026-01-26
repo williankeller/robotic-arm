@@ -42,18 +42,17 @@ void moveInitialPosition() {
 
 void grab() {
     moveShoulder(90);//90
-    moveElbow(130);
-    moveWrist(60);
+    moveElbow(90);
     delay(200);
-    moveHand(180);
+    moveShoulder(75);
     openGripper();
-    moveElbow(150);
-    moveShoulder(50);
-    moveWrist(80);
-    moveElbow(160);
     delay(500);
+    moveWrist(145);
+    moveElbow(100);
+
     closeGripper();
     delay(500);
+
     moveInitialPosition();
     delay(300);
     moveBase(60);
