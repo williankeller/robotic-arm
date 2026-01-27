@@ -71,24 +71,28 @@ The arm uses a mix of standard PWM servos and Hiwonder LX-1501 bus servos.
 
 ### Bus Servo Wiring
 
-The three bus servos are daisy-chained on a single data line using the Hiwonder LX serial protocol (half-duplex UART at 115200 baud).
+The bus servos use the Hiwonder LX serial protocol (half-duplex UART at 115200 baud). A **BusLinker** board bridges the Arduino's full-duplex serial to the servo's single-wire bus.
 
 ```
-Arduino Pin 7 (TX) --[1K resistor]--> Servo data line
-Arduino Pin 6 (RX) -------------------> Servo data line
+Arduino Pin 7 (TX)  --> BusLinker RX
+Arduino Pin 6 (RX)  <-- BusLinker TX
+Arduino GND --------- BusLinker GND
+BusLinker Vin <------ 6–7.4V power supply
+BusLinker Servo Interface --> Servo 1 --> Servo 2 --> Servo 3
+                              (PH2.0/3P daisy-chain cables)
 ```
 
-- All three bus servos share the same data line (daisy-chained via the pass-through connectors on each servo)
-- Each servo must have a unique ID (1, 2, 3) set via the Hiwonder servo configuration tool
-- The 1K resistor on the TX line is required for half-duplex communication
+- The BusLinker handles half-duplex conversion — no resistor needed
+- All three bus servos are daisy-chained via the PH2.0/3P pass-through connectors on each servo
+- Each servo must have a unique ID (1, 2, 3) set via the Hiwonder BusLinker software (Bus Servo Terminal) before wiring
 - Bus servos support position readback and torque enable/disable (used for teach mode)
 
 ### Power
 
 - **PWM Servos (MG996R):** 6V DC from an external power supply, current limit at least 10A
-- **Bus Servos (LX-1501):** 6–7.4V from the same external supply (share the servo power rail)
+- **Bus Servos (LX-1501) + BusLinker:** 6–7.4V from the same external supply into the BusLinker Vin terminal (powers both the BusLinker and the daisy-chained servos)
 - **Arduino:** Powered via USB (separate from servo power)
-- Connect the power supply GND to the Arduino GND (common ground)
+- Connect the power supply GND to both the Arduino GND and the BusLinker GND (common ground)
 - Do not power servos from the Arduino 5V pin
 
 ### HuskyLens (Optional)

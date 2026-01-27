@@ -1,9 +1,10 @@
 #include <SoftwareSerial.h>
 
-// Bus servo serial pins
-// Wiring: TX (pin 7) through a 1K resistor to servo data line
-//         RX (pin 6) directly to servo data line
-//         All bus servos daisy-chained on the same data line
+// Bus servo serial pins (connect to BusLinker board)
+// Wiring: Arduino TX (pin 7) --> BusLinker RX
+//         Arduino RX (pin 6) <-- BusLinker TX
+//         Arduino GND -------- BusLinker GND
+//         BusLinker servo interface --> daisy-chained servos (PH2.0/3P cables)
 #define BUS_SERVO_RX_PIN 6
 #define BUS_SERVO_TX_PIN 7
 
