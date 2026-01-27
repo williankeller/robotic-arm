@@ -35,6 +35,30 @@ HuskyLens is **optional**. The arm starts in manual mode and accepts serial comm
 | `tracking off` | Disable tracking and return to home position |
 | `tracking` | Show current tracking status |
 
+## Wiring
+
+### Servo Pin Mapping (Arduino Uno)
+
+| Servo | Digital Pin | Default Angle |
+|-------|-------------|---------------|
+| Base | 3 (PWM) | 90° |
+| Shoulder | 5 (PWM) | 140° |
+| Elbow | 6 (PWM) | 100° |
+| Wrist | 9 (PWM) | 135° |
+| Hand | 10 (PWM) | 90° |
+| Gripper | 11 (PWM) | 20° |
+
+### Power
+
+- **Servos (MG996R):** 6V DC from an external power supply, current limit at least 10A
+- **Arduino:** Powered via USB (separate from servo power)
+- Connect the power supply GND to the Arduino GND (common ground)
+- Do not power servos from the Arduino 5V pin
+
+### HuskyLens (Optional)
+
+Connected via I2C (SDA/SCL pins). Set Protocol Type to I2C in HuskyLens settings.
+
 ## Arm Geometry
 
 - The height of the shoulder joint is **81mm** _(The base turns 180° on its axis left to right - 90° is the center)_;
