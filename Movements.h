@@ -56,7 +56,7 @@ void grab() {
     // Phase 3: Extend arm to reach object (shoulder + elbow + wrist together)
     {
         ArmPart *parts[] = {&arm.shoulder, &arm.elbow, &arm.wrist};
-        int targets[] = {50, 160, 170};
+        int targets[] = {80, 130, 160};
         moveJointsSynchronized(parts, targets, 3);
     }
     delay(500);
