@@ -25,6 +25,18 @@ Connect via Serial Monitor at **9600 baud** with **Newline** line ending. Send `
 | `grab` | Run full pick-and-place sequence |
 | `position x,y,z,gripAngle` | Move to Cartesian position using inverse kinematics (mm, radians) |
 
+### Teach Mode
+
+Record arm positions by physically moving the bus servos (elbow, wrist, hand) and replay them. PWM servos (base, shoulder, gripper) are controlled via serial commands during teach mode.
+
+| Command | Description |
+|---------|-------------|
+| `teach on` | Enter teach mode (disables torque on bus servos so they can be moved by hand) |
+| `teach capture` | Save current arm position as a waypoint (max 20) |
+| `teach play` | Replay all recorded waypoints with synchronized movement |
+| `teach off` | Exit teach mode (re-enables torque on bus servos) |
+| `teach` | Show teach mode status and waypoint count |
+
 ### Vision Tracking
 
 HuskyLens is **optional**. The arm starts in manual mode and accepts serial commands without HuskyLens connected. Use the `tracking` command to enable auto tracking at runtime.
@@ -39,18 +51,42 @@ HuskyLens is **optional**. The arm starts in manual mode and accepts serial comm
 
 ### Servo Pin Mapping (Arduino Uno)
 
-| Servo | Digital Pin | Default Angle |
-|-------|-------------|---------------|
-| Base | 3 (PWM) | 90° |
-| Shoulder | 5 (PWM) | 140° |
-| Elbow | 6 (PWM) | 100° |
-| Wrist | 9 (PWM) | 135° |
-| Hand | 10 (PWM) | 90° |
-| Gripper | 11 (PWM) | 20° |
+The arm uses a mix of standard PWM servos and Hiwonder LX-1501 bus servos.
+
+**PWM Servos** (controlled via Arduino PWM pins):
+
+| Servo | Digital Pin | Default Angle | Range |
+|-------|-------------|---------------|-------|
+| Base | 3 | 90° | 35–150° |
+| Shoulder | 5 | 140° | 0–180° |
+| Gripper | 11 | 20° | 20–90° |
+
+**Bus Servos — Hiwonder LX-1501** (controlled via half-duplex serial):
+
+| Servo | Bus ID | Default Angle | Range |
+|-------|--------|---------------|-------|
+| Elbow | 1 | 100° | 0–140° |
+| Wrist | 2 | 135° | 89–180° |
+| Hand | 3 | 90° | 0–180° |
+
+### Bus Servo Wiring
+
+The three bus servos are daisy-chained on a single data line using the Hiwonder LX serial protocol (half-duplex UART at 115200 baud).
+
+```
+Arduino Pin 7 (TX) --[1K resistor]--> Servo data line
+Arduino Pin 6 (RX) -------------------> Servo data line
+```
+
+- All three bus servos share the same data line (daisy-chained via the pass-through connectors on each servo)
+- Each servo must have a unique ID (1, 2, 3) set via the Hiwonder servo configuration tool
+- The 1K resistor on the TX line is required for half-duplex communication
+- Bus servos support position readback and torque enable/disable (used for teach mode)
 
 ### Power
 
-- **Servos (MG996R):** 6V DC from an external power supply, current limit at least 10A
+- **PWM Servos (MG996R):** 6V DC from an external power supply, current limit at least 10A
+- **Bus Servos (LX-1501):** 6–7.4V from the same external supply (share the servo power rail)
 - **Arduino:** Powered via USB (separate from servo power)
 - Connect the power supply GND to the Arduino GND (common ground)
 - Do not power servos from the Arduino 5V pin

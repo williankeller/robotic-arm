@@ -1,7 +1,6 @@
 #include <Wire.h>
 #include <Servo.h>
 #include "HUSKYLENS.h"
-#include "SoftwareSerial.h"
 #include "InverseKinematics.h"
 #include "Movements.h"
 
@@ -45,7 +44,6 @@ void setup() {
 
     if (!huskyLensConnected) {
         Serial.println(F("HuskyLens not found. Arm running in manual mode."));
-        Serial.println(F("Use 'tracking on' to enable auto tracking after connecting HuskyLens."));
     }
 
     Serial.println(F("Ready. Send 'help' for available commands."));
@@ -71,6 +69,16 @@ void resetTrackingPositions() {
     handCurrentPos = arm.hand.defaultAngle;
 }
 
+// Write angle to a servo (handles both PWM and bus types for vision tracking)
+void writeServoAngle(ArmPart &part, int angle) {
+    angle = constrain(angle, part.minAngle, part.maxAngle);
+    if (part.type == SERVO_BUS) {
+        busServoMove(part.pin, degreesToBusPos(angle), 50);
+    } else {
+        part.servo.write(angle);
+    }
+}
+
 void loop() {
     // Always process serial commands, regardless of HuskyLens state
     if (Serial.available() > 0) {
@@ -93,13 +101,32 @@ void handleCommand(String &data) {
         hasLastPosition = false;
     }
 
+    else if (data.startsWith("teach")) {
+        String param = data.substring(6);
+        param.trim();
+
+        if (param == "on") {
+            teachStart();
+        } else if (param == "capture") {
+            teachCapture();
+        } else if (param == "play") {
+            teachPlay();
+        } else if (param == "off") {
+            teachStop();
+        } else {
+            Serial.print(F("Teach mode is "));
+            Serial.println(teachMode ? F("on") : F("off"));
+            Serial.print(F("Waypoints: "));
+            Serial.println(teachCount);
+        }
+    }
+
     else if (data.startsWith("tracking")) {
         String param = data.substring(9);
         param.trim();
 
         if (param == "on") {
             if (!huskyLensConnected) {
-                // Try to connect now in case it was plugged in after boot
                 Wire.begin();
                 if (huskylens.begin(Wire)) {
                     huskyLensConnected = true;
@@ -188,6 +215,10 @@ void handleCommand(String &data) {
         Serial.println(F("  grab               - Pick-and-place sequence"));
         Serial.println(F("  position x,y,z,grip - IK move (mm, radians)"));
         Serial.println(F("  tracking on|off    - Enable/disable auto tracking"));
+        Serial.println(F("  teach on           - Enter teach mode (bus servos free)"));
+        Serial.println(F("  teach capture      - Save current position as waypoint"));
+        Serial.println(F("  teach play         - Replay recorded waypoints"));
+        Serial.println(F("  teach off          - Exit teach mode"));
         Serial.println(F("  help               - Show this message"));
     }
 }
@@ -260,13 +291,12 @@ void runVisionTracking() {
         }
         wristCurrentPos += (targetWrist - wristCurrentPos) * VISION_SMOOTHING;
 
-        // Write directly to servos for responsive vision tracking
-        // (no easing needed since adjustments are small and continuous)
-        arm.base.servo.write(constrain((int)currentHorizontalPos, arm.base.minAngle, arm.base.maxAngle));
-        arm.shoulder.servo.write(constrain((int)shoulderCurrentPos, arm.shoulder.minAngle, arm.shoulder.maxAngle));
-        arm.elbow.servo.write(constrain((int)elbowCurrentPos, arm.elbow.minAngle, arm.elbow.maxAngle));
-        arm.wrist.servo.write(constrain((int)wristCurrentPos, arm.wrist.minAngle, arm.wrist.maxAngle));
-        arm.hand.servo.write(constrain((int)handCurrentPos, arm.hand.minAngle, arm.hand.maxAngle));
+        // Write to servos (handles both PWM and bus types)
+        writeServoAngle(arm.base, (int)currentHorizontalPos);
+        writeServoAngle(arm.shoulder, (int)shoulderCurrentPos);
+        writeServoAngle(arm.elbow, (int)elbowCurrentPos);
+        writeServoAngle(arm.wrist, (int)wristCurrentPos);
+        writeServoAngle(arm.hand, (int)handCurrentPos);
     }
 }
 

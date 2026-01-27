@@ -1,13 +1,17 @@
 #include <Servo.h>
 
+// Servo type: PWM (standard) or BUS (Hiwonder LX serial protocol)
+enum ServoType { SERVO_PWM, SERVO_BUS };
+
 // Define a structure for each part of the arm
 struct ArmPart {
     String name;
-    int pin;
+    int pin;          // PWM: Arduino pin number, BUS: servo ID
     int minAngle;
     int maxAngle;
     int defaultAngle;
-    Servo servo;
+    ServoType type;
+    Servo servo;      // Only used for SERVO_PWM
 };
 
 // Define a structure for the robot arm
@@ -21,12 +25,14 @@ struct RobotArm {
 };
 
 // Initialize the arm
+// PWM servos: base (pin 3), shoulder (pin 5), gripper (pin 11)
+// Bus servos: elbow (ID 1), wrist (ID 2), hand (ID 3)
 RobotArm arm = {
-// part name, pin on the board, min angle, max angle, default angle
-    {"base",     3, 35, 150, 90},
-    {"shoulder", 5, 0, 180, 140},
-    {"elbow",    6, 0, 140, 100},
-    {"wrist",    9, 89, 180, 135},
-    {"hand",     10, 0, 180, 90},
-    {"gripper",  11, 20, 90, 20}
+// name,       pin/ID, min, max, default, type
+    {"base",     3,  35, 150,  90, SERVO_PWM},
+    {"shoulder", 5,  0,  180, 140, SERVO_PWM},
+    {"elbow",    1,  0,  140, 100, SERVO_BUS},
+    {"wrist",    2,  89, 180, 135, SERVO_BUS},
+    {"hand",     3,  0,  180,  90, SERVO_BUS},
+    {"gripper",  11, 20,  90,  20, SERVO_PWM}
 };
