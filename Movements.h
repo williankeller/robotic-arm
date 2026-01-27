@@ -44,7 +44,7 @@ void grab() {
     // Phase 1: Move arm to pre-grab posture (shoulder + elbow + wrist together)
     {
         ArmPart *parts[] = {&arm.shoulder, &arm.elbow, &arm.wrist};
-        int targets[] = {90, 130, 60};
+        int targets[] = {90, 130, 89};
         moveJointsSynchronized(parts, targets, 3);
     }
     delay(200);
@@ -56,7 +56,7 @@ void grab() {
     // Phase 3: Extend arm to reach object (shoulder + elbow + wrist together)
     {
         ArmPart *parts[] = {&arm.shoulder, &arm.elbow, &arm.wrist};
-        int targets[] = {50, 160, 80};
+        int targets[] = {50, 160, 89};
         moveJointsSynchronized(parts, targets, 3);
     }
     delay(500);
@@ -72,7 +72,7 @@ void grab() {
     // Phase 6: Move to drop position (base + shoulder + wrist + hand together)
     {
         ArmPart *parts[] = {&arm.base, &arm.shoulder, &arm.wrist, &arm.hand};
-        int targets[] = {60, 100, 30, 90};
+        int targets[] = {60, 100, 89, 90};
         moveJointsSynchronized(parts, targets, 4);
     }
     delay(1000);
