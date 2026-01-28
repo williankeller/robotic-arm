@@ -69,6 +69,22 @@ The arm uses a mix of standard PWM servos and Hiwonder LX-1501 bus servos.
 | Wrist | 2 | 135° | 89–180° |
 | Hand | 3 | 90° | 0–180° |
 
+**LX-1501 Specifications:**
+
+| Parameter | Value |
+|-----------|-------|
+| Working voltage | 6–8.4V |
+| Torque | 17 kg·cm (at 7.4V) |
+| Speed | 0.16 sec/60° (at 7.4V) |
+| Rotation range | 0–240° (mapped to 0–1000 position units) |
+| Accuracy | 0.3° |
+| No-load current | 100 mA |
+| Stall current | 2.4–3 A |
+| Communication | UART 115200 baud, servo ID 0–253 (default 1) |
+| Feedback | temperature, voltage, position, angle |
+| Connector | PH2.0-3P (20 cm default wire) |
+| Size / Weight | 54.4 × 20.0 × 45.5 mm / 58 g |
+
 ### Bus Servo Wiring
 
 The bus servos use the Hiwonder LX serial protocol (half-duplex UART at 115200 baud). A **BusLinker** board bridges the Arduino's full-duplex serial to the servo's single-wire bus.
@@ -77,7 +93,7 @@ The bus servos use the Hiwonder LX serial protocol (half-duplex UART at 115200 b
 Arduino Pin 7 (TX)  --> BusLinker RX
 Arduino Pin 6 (RX)  <-- BusLinker TX
 Arduino GND --------- BusLinker GND
-BusLinker Vin <------ 6–7.4V power supply
+BusLinker Vin <------ 6–8.4V power supply
 BusLinker Servo Interface --> Servo 1 --> Servo 2 --> Servo 3
                               (PH2.0/3P daisy-chain cables)
 ```
@@ -86,11 +102,12 @@ BusLinker Servo Interface --> Servo 1 --> Servo 2 --> Servo 3
 - All three bus servos are daisy-chained via the PH2.0/3P pass-through connectors on each servo
 - Each servo must have a unique ID (1, 2, 3) set via the Hiwonder BusLinker software (Bus Servo Terminal) before wiring
 - Bus servos support position readback and torque enable/disable (used for teach mode)
+- Use the **Hiwonder BusLinker** debug board — it has matching PH2.0/3P connectors and the Bus Servo Terminal software for configuring servo IDs
 
 ### Power
 
 - **PWM Servos (MG996R):** 6V DC from an external power supply, current limit at least 10A
-- **Bus Servos (LX-1501) + BusLinker:** 6–7.4V from the same external supply into the BusLinker Vin terminal (powers both the BusLinker and the daisy-chained servos)
+- **Bus Servos (LX-1501) + BusLinker:** 6–8.4V from the same external supply into the BusLinker Vin terminal (powers both the BusLinker and the daisy-chained servos)
 - **Arduino:** Powered via USB (separate from servo power)
 - Connect the power supply GND to both the Arduino GND and the BusLinker GND (common ground)
 - Do not power servos from the Arduino 5V pin
